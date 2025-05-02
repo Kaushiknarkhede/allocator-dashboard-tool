@@ -4,11 +4,12 @@ import plotly.express as px
 from pptx import Presentation
 from pptx.util import Inches
 import io
+from datetime import datetime
 
-# ✅ THIS MUST COME FIRST
+# ✅ MUST BE FIRST Streamlit COMMAND
 st.set_page_config(layout="wide")
 
-# Then all your initialization logic
+# ---- Session State ----
 if "selected_tile" not in st.session_state:
     st.session_state.selected_tile = None
 if "page" not in st.session_state:
@@ -16,15 +17,10 @@ if "page" not in st.session_state:
 if "objective" not in st.session_state:
     st.session_state.objective = "Objective: Not defined"
 
-st.title("Hello from Kaushik's Allocator Dashboard Tool 👋")
-st.write("More functionality coming soon!")
-
-import streamlit as st
-from PIL import Image
-
-st.set_page_config(layout="wide")
+# ---- App Title ----
 st.title("Business Planning Tool")
 
+# ---- Screen 1A: Tile Selection ----
 tiles = {
     "Business Overview": "CXO",
     "Financial Planning": "CFO Role",
@@ -57,20 +53,25 @@ for idx, (title, role) in enumerate(rows[4:]):
         else:
             st.markdown(f"**{title}**\n\n_Coming Soon_")
 
-
+# ---- Screen 1B / 1C: Use Case Selection ----
 if st.session_state.get("selected_tile") == "Inventory Planning":
     st.subheader("Allocator Use Cases")
     use_cases = ["Replenishment", "Allocation", "IST", "Pullback"]
     selected = st.multiselect("Select Use Cases", use_cases)
 
-    # Generate objective sentence
-    objective = "Objective: "
-    if "Replenishment" in selected: objective += "Replenishment "
-    if "Allocation" in selected: objective += "+ Allocation "
-    if "Pullback" in selected: objective += "+ Pullback "
-    if "IST" in selected: objective += "+ IST "
-    
-    st.markdown(f"**{objective.strip()}**")
+    # Objective logic
+    usecase_map = {
+        ("Allocation", "Pullback", "Replenishment"): "User is doing replenishment with replacement and pullback to warehouse of bottom seller styles",
+        ("Allocation", "IST", "Pullback", "Replenishment"): "User is doing ideal Inter store transfer with health correction, replenishment, replacement and pullback",
+        ("Pullback", "Replenishment"): "User is doing replenishment with pullback to warehouse of bottom seller styles",
+        ("Allocation", "Replenishment"): "User is doing replenishment with replacement with new styles",
+    }
+
+    usecase_tuple = tuple(sorted(selected))
+    st.session_state.objective = usecase_map.get(
+        usecase_tuple, f"User selected: {', '.join(selected)}"
+    )
+    st.markdown(f"**{st.session_state.objective}**")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -80,10 +81,10 @@ if st.session_state.get("selected_tile") == "Inventory Planning":
         if st.button("📁 Go to Data Upload Page"):
             st.session_state.page = "upload"
 
-if st.session_state.get("page") == "upload":
-    st.subheader("Upload Your Input Files (.xlsx only)")
+# ---- Screen 4: File Upload ----
+if st.session_state.page == "upload":
+    st.subheader("📁 Upload Your Input Files (.xlsx only)")
     files = {}
-
     file_names = [
         "Sales", "Store Stock On Hand", "Warehouse Stock",
         "GRN", "Output", "Implementation Data", "Master"
@@ -94,14 +95,12 @@ if st.session_state.get("page") == "upload":
     if st.button("Process Files"):
         st.success("Files uploaded. You can now run the algorithm.")
 
-import pandas as pd
-import plotly.express as px
-from datetime import datetime
-
-if st.session_state.get("page") == "dashboard":
+# ---- Screen 2: Dashboard View ----
+if st.session_state.page == "dashboard":
     st.subheader("📊 Dashboard: Impact Analysis")
-    st.markdown(f"**{objective}**")
+    st.markdown(f"**{st.session_state.objective}**")
 
+    # Inputs
     col1, col2, col3, col4 = st.columns(4)
     with col1: date = st.date_input("📅 Date")
     with col2: timestamp = st.time_input("⏱️ Time")
@@ -113,6 +112,7 @@ if st.session_state.get("page") == "dashboard":
         else:
             pre_days = st.number_input("Pre Days", min_value=1, step=1)
 
+    # Metrics
     st.markdown("### Key Metrics (dummy data)")
     metrics = {
         "Revenue/Day": 12500,
@@ -127,6 +127,7 @@ if st.session_state.get("page") == "dashboard":
         with cols[i]:
             st.metric(k, value=v)
 
+    # KPI Widget Table
     st.markdown("### KPI Widgets")
     kpi_df = pd.DataFrame({
         "KPI": ["rev/day", "DOH", "Stock out rate", "Sales vs Stock mix"],
@@ -134,35 +135,29 @@ if st.session_state.get("page") == "dashboard":
     })
     st.dataframe(kpi_df)
 
+    # Simple Bar Chart
     fig = px.bar(x=["rev/day", "ros"], y=[12000, 2.1], labels={"x": "Metric", "y": "Value"})
     st.plotly_chart(fig)
 
-    if st.button("📤 Export as PPTX"):
-        st.success("Your PPT will be downloaded here soon.")
+    # PPT Generator Function
+    def generate_ppt():
+        ppt = Presentation()
+        slide = ppt.slides.add_slide(ppt.slide_layouts[0])
+        title, content = slide.shapes.title, slide.placeholders[1]
+        title.text = "Impact Analysis Summary"
+        content.text = st.session_state.objective
 
-from pptx import Presentation
-from pptx.util import Inches
-import io
+        slide = ppt.slides.add_slide(ppt.slide_layouts[1])
+        title, content = slide.shapes.title, slide.placeholders[1]
+        title.text = "Key Metrics"
+        content.text = "\n".join([f"{k}: {v}" for k, v in metrics.items()])
 
-def generate_ppt():
-    ppt = Presentation()
-    slide = ppt.slides.add_slide(ppt.slide_layouts[0])
-    title, content = slide.shapes.title, slide.placeholders[1]
-    title.text = "Impact Analysis Summary"
-    content.text = objective
+        buffer = io.BytesIO()
+        ppt.save(buffer)
+        buffer.seek(0)
+        return buffer
 
-    slide = ppt.slides.add_slide(ppt.slide_layouts[1])
-    title, content = slide.shapes.title, slide.placeholders[1]
-    title.text = "Key Metrics"
-    content.text = "\n".join([f"{k}: {v}" for k, v in metrics.items()])
-
-    buffer = io.BytesIO()
-    ppt.save(buffer)
-    buffer.seek(0)
-    return buffer
-
-if st.button("Download PPT"):
-    ppt_file = generate_ppt()
-    st.download_button("📥 Click to Download", ppt_file, file_name="impact_summary.pptx")
-
+    if st.button("📥 Download PPT"):
+        ppt_file = generate_ppt()
+        st.download_button("Click to Download", ppt_file, file_name="impact_summary.pptx")
 
