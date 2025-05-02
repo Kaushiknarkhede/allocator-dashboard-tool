@@ -1,4 +1,20 @@
 import streamlit as st
+import pandas as pd
+import plotly.express as px
+from pptx import Presentation
+from pptx.util import Inches
+import io
+
+# ✅ THIS MUST COME FIRST
+st.set_page_config(layout="wide")
+
+# Then all your initialization logic
+if "selected_tile" not in st.session_state:
+    st.session_state.selected_tile = None
+if "page" not in st.session_state:
+    st.session_state.page = None
+if "objective" not in st.session_state:
+    st.session_state.objective = "Objective: Not defined"
 
 st.title("Hello from Kaushik's Allocator Dashboard Tool 👋")
 st.write("More functionality coming soon!")
